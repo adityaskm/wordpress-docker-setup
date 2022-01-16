@@ -1,0 +1,75 @@
+version: '3.1'
+
+services:
+  wordpress:
+    image: wordpress
+    restart: always
+    # ports:
+    #   - 80:80
+    #   - 443:80
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wordpress:/var/www/html                                                                                             
+
+  db:
+    image: mysql:5.7
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+      MYSQL_ROOT_PASSWORD: wordpress
+    volumes:
+        - ./mysql:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    ports:
+      - 8081:80
+    environment:
+      - PMA_ARBITRARY=1 
+      - UPLOAD_LIMIT=300M
+
+  webserver:                                                                                        
+    depends_on:                                                                                     
+      - wordpress                                                                                   
+    image: nginx:1.15.12-alpine                                                                     
+    container_name: webserver                                                                       
+    restart: unless-stopped                                                                         
+    ports:                                                                                          
+      - "80:80"                                                                                     
+      - "443:443"                                                                                   
+    volumes:                                                                                        
+      # we will also mount wordpress to nginx's                                                     
+      #   html folder to easily serve it                                                            
+      - ./wordpress:/var/www/html                                                                     
+      # we need to add our own nginx-config folder                                                         
+      - ./nginx:/etc/nginx/conf.d
+
+  certbot:                                                                                             
+    depends_on:                                                                                        
+      - webserver                                                                                      
+    image: certbot/certbot                                                                             
+    container_name: certbot                                                                            
+    volumes:                                                                                           
+      # we save our directory of keys on our host server                                            
+      - ./certbotdata:/etc/letsencrypt                                                                   
+      # we bind our wordpress site to the html root                                                 
+      - ./wordpress:/var/www/html                                                                        
+    # this command will generate the certificate.                                                   
+    # make sure to change your -d and --email flags                                                 
+    command: certonly --webroot --webroot-path=/var/www/html --email aditya18thm@yahoo.com --agree-tos --no-eff-email --force-renewal -d domain.com -d www.domain.com      
+
+
+# volumes:
+#   wordpress: 
+#     - ./httpdocs
+#   db:
+#     - ./mysql
